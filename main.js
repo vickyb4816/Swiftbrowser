@@ -10,20 +10,13 @@ const tls = require('tls');
 tls.DEFAULT_MIN_VERSION = 'TLSv1'; 
 
 // ==========================================
-// 1. ULTRA LOW-RAM ENGINE FLAGS (Caps RAM at ~1.5GB)
+// 1. CONSERVATIVE MEMORY AND SECURITY DEFAULTS
 // ==========================================
-app.commandLine.appendSwitch('process-per-site'); // Shares 1 process across all same-domain tabs (Saves 600MB+)
-app.commandLine.appendSwitch('disable-site-isolation-trials'); // Removes multi-process overhead (Saves 500MB+)
-app.commandLine.appendSwitch('renderer-process-limit', '6'); // Hard-caps total background processes
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=384 --optimize-for-size'); // Caps JS memory per tab
-app.commandLine.appendSwitch('disk-cache-size', '52428800'); // 50MB max disk cache
+// Inactive pages are unloaded by the tab manager in index.html.
+// Avoid global process hacks: they do not impose a reliable RAM cap
+// and can cause instability or weaken browser security.
+app.commandLine.appendSwitch('disk-cache-size', '52428800'); // 50 MB disk cache limit
 
-// Keep tabs alive without freezing
-app.commandLine.appendSwitch('disable-background-timer-throttling');
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-app.commandLine.appendSwitch('ignore-certificate-errors'); 
-app.commandLine.appendSwitch('CipherSuiteBlacklist', '0x0000');
 
 let mainWindow;
 const configPath = path.join(app.getPath('userData'), 'swift-config.json');
