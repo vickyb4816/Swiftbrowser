@@ -61,6 +61,11 @@ app.whenReady().then(async () => {
       details.requestHeaders['Connection'] = 'keep-alive';
       details.requestHeaders['Cache-Control'] = 'max-age=3600';
     }
+    // WhatsApp Web checks the browser identity. Present the bundled Chromium 108
+    // as Chrome 108 on Windows 7 (Electron 22 uses Chromium 108).
+    if (/https?:\/\/(web\.)?whatsapp\.com\//i.test(details.url)) {
+      details.requestHeaders['User-Agent'] = 'Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36';
+    }
     callback({ requestHeaders: details.requestHeaders });
   });
 
