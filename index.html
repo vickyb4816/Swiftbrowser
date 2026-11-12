@@ -62,7 +62,7 @@
 <body>
 
   <div id="tab-bar">
-    <button id="new-tab-btn" onclick="createNewTab('https://www.google.com')" title="New Tab">+</button>
+    <button id="new-tab-btn" onclick="createNewTab(settingsPrefs.homePage || 'https://www.google.com')" title="New Tab">+</button>
   </div>
 
   <div id="toolbar">
@@ -269,6 +269,7 @@ capstone</textarea>
     }
 
     async function initBrowser() {
+      try { settingsPrefs = Object.assign(settingsPrefs, JSON.parse(localStorage.getItem('swift-settings-v1') || '{}')); } catch (e) {}
       const config = await ipcRenderer.invoke('get-config');
       renderConfig(config);
       let saved = [];
@@ -390,6 +391,7 @@ capstone</textarea>
 
       activeTabId = tabId;
       tabs.forEach(t => {
+        if (t.webview) t.webview.classList.remove('active');
         t.tabEl.classList.toggle('active', t.id === tabId);
         if (t.id === tabId) t.tabEl.querySelector('.tab-title').innerText = t.title || 'Loading...';
       });
@@ -421,8 +423,9 @@ capstone</textarea>
       let input = document.getElementById('url-input').value.trim();
       if (!input) return;
       if (!/^https?:\/\//i.test(input)) {
-        input = input.includes('.') || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(input)
+        input = /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(input)
           ? 'http://' + input
+          : input.includes('.') ? 'https://' + input
           : 'https://' + ({google:'www.google.com/search?q=',bing:'www.bing.com/search?q=',duckduckgo:'duckduckgo.com/?q='}[settingsPrefs.searchEngine || 'google']) + encodeURIComponent(input);
       }
       try { new URL(input); } catch (e) { showToast('Invalid address. Check the URL and try again.'); return; }
