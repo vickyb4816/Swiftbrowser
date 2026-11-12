@@ -20,7 +20,7 @@
     #toolbar { display: flex; align-items: center; background: #35363a; padding: 6px 10px; gap: 6px; border-bottom: 1px solid #202124; }
     .nav-btn { background: transparent; border: none; color: #e8eaed; font-size: 15px; padding: 5px 8px; border-radius: 50%; cursor: pointer; }
     .nav-btn:hover { background: #4a4b50; }
-    #url-input { flex: 1; background: #202124; border: 1px solid #5f6368; color: #fff; border-radius: 20px; padding: 7px 14px; font-size: 13px; outline: none; user-select: text; }
+    #url-input { flex: 1; -webkit-user-select: text; user-select: text; background: #202124; border: 1px solid #5f6368; color: #fff; border-radius: 20px; padding: 7px 14px; font-size: 13px; outline: none; user-select: text; }
     #url-input:focus { border-color: #8ab4f8; }
     .action-btn { background: #292a2d; border: 1px solid #5f6368; color: #e8eaed; padding: 6px 10px; border-radius: 14px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
     .action-btn:hover { background: #4a4b50; }
@@ -34,6 +34,18 @@
 
     /* Floating Panels */
     .floating-panel { display: none; position: fixed; right: 15px; top: 90px; width: 340px; background: #292a2d; border: 1px solid #5f6368; border-radius: 8px; padding: 15px; z-index: 999; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+    #settings-panel { inset: 42px 4% 4%; top: 42px; width: auto; max-width: 1100px; margin: 0 auto; max-height: calc(100vh - 60px); overflow: auto; z-index: 2000; }
+    #settings-panel input, #settings-panel textarea, #settings-panel select { color: #fff; background: #202124; border: 1px solid #5f6368; border-radius: 6px; padding: 8px; user-select: text; }
+    .settings-grid { display: grid; grid-template-columns: 180px 1fr; gap: 18px; }
+    .settings-nav { display: flex; flex-direction: column; gap: 6px; }
+    .settings-nav button { text-align: left; background: #202124; border: 1px solid #444; color: #eee; padding: 10px; border-radius: 6px; cursor: pointer; }
+    .settings-section { background: #202124; padding: 14px; border-radius: 8px; margin-bottom: 12px; }
+    .settings-section h4 { color: #8ab4f8; margin-bottom: 10px; }
+    .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 10px 0; }
+    .settings-row small { color: #9aa0a6; display: block; }
+    .settings-nav button.selected { border-color: #8ab4f8; background: #303846; }
+    .settings-section button { cursor: pointer; }
+    .settings-close { float: right; }
     .floating-panel h4 { margin-bottom: 8px; font-size: 14px; color: #8ab4f8; }
     .domain-tag { display: inline-block; background: #35363a; padding: 3px 8px; border-radius: 4px; font-size: 11px; margin: 3px; border: 1px solid #5f6368; }
     
@@ -90,20 +102,70 @@
     <button class="action-btn mac-btn" style="width:100%; justify-content:center;" onclick="launchSiebel()">Launch Siebel Native Engine</button>
   </div>
 
-  <!-- Office Settings Panel -->
+  <!-- Chrome-style centralized Settings -->
   <div id="settings-panel" class="floating-panel">
-    <h4>Zero-Freeze Office Base URLs</h4>
-    <p style="font-size:11px; color:#9aa0a6; margin-bottom:8px;">Core URLs kept awake with shared low-RAM pooling:</p>
-    <div style="display:flex; gap:5px; margin-bottom:10px;">
-      <input type="text" id="priority-input" placeholder="cnmaestro.com" style="flex:1; padding:5px; border-radius:4px; border:1px solid #5f6368; background:#202124; color:#fff;">
-      <button class="action-btn" onclick="addPriorityDomain()">Add</button>
-    </div>
-    <div id="priority-list" style="margin-bottom:14px;"></div>
-    <hr style="border-color:#35363a; margin:10px 0;">
-    <h4>Chrome Extensions & Bookmarks</h4>
-    <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
-      <button class="action-btn" onclick="importBookmarks()">&#128194; Import Chrome Bookmarks (HTML)</button>
-      <button class="action-btn" onclick="loadChromeExtension()">&#129513; Load Unpacked Chrome Extension</button>
+    <button class="action-btn settings-close" onclick="toggleSettings()">Close ✕</button>
+    <h3 style="color:#e8eaed; margin-bottom:14px;">Swift Browser Settings</h3>
+    <div class="settings-grid">
+      <nav class="settings-nav">
+        <button class="selected" onclick="showSettingsSection('general',this)">General</button>
+        <button onclick="showSettingsSection('tabs',this)">Tabs & Memory</button>
+        <button onclick="showSettingsSection('privacy',this)">Privacy & Data</button>
+        <button onclick="showSettingsSection('tools',this)">Office Tools</button>
+        <button onclick="showSettingsSection('updates',this)">About & Updates</button>
+      </nav>
+      <div>
+        <section id="settings-general" class="settings-page">
+          <div class="settings-section">
+            <h4>Startup</h4>
+            <div class="settings-row"><div><b>Restore previous workspace</b><small>Reopen saved tabs when Swift Browser starts.</small></div><input id="pref-restore" type="checkbox" checked></div>
+            <div class="settings-row"><div><b>Home page</b><small>Address opened by the new-tab button.</small></div><input id="pref-home" style="width:55%" value="https://www.google.com"></div>
+            <div class="settings-row"><div><b>Search engine</b><small>Used when you type words instead of a web address.</small></div><select id="pref-search"><option value="google">Google</option><option value="bing">Bing</option><option value="duckduckgo">DuckDuckGo</option></select></div>
+          </div>
+        </section>
+        <section id="settings-tabs" class="settings-page" style="display:none">
+          <div class="settings-section">
+            <h4>Memory management</h4>
+            <div class="settings-row"><div><b>Sleep inactive tabs</b><small>Unloads inactive pages; they reload when selected. Session/login restoration depends on each website.</small></div><input id="pref-sleep" type="checkbox" checked></div>
+            <div class="settings-row"><div><b>Maximum active background tabs</b><small>Excludes the current tab and pinned sites.</small></div><select id="pref-max-live"><option value="0">0 (lowest memory)</option><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select></div>
+            <label style="display:block;margin-top:12px">Keep these domains active (one per line)</label>
+            <textarea id="pref-pinned" rows="5" style="width:100%;margin-top:6px">whatsapp.com
+capstone</textarea>
+            <button class="action-btn mac-btn" style="margin-top:10px" onclick="saveSettings()">Save tab settings</button>
+          </div>
+        </section>
+        <section id="settings-privacy" class="settings-page" style="display:none">
+          <div class="settings-section">
+            <h4>Browsing data</h4>
+            <p style="color:#9aa0a6;font-size:12px;margin-bottom:10px">Clear cached files only. This does not intentionally clear saved cookies or logins.</p>
+            <button class="action-btn" onclick="cleanCache()">Clear cache</button>
+          </div>
+        </section>
+        <section id="settings-tools" class="settings-page" style="display:none">
+          <div class="settings-section">
+            <h4>Office tools</h4>
+            <div class="settings-row"><div><b>MAC address converter</b><small>Built-in local tool.</small></div><button class="action-btn" onclick="toggleMacPanel()">Open MAC Tool</button></div>
+            <div class="settings-row"><div><b>Siebel legacy engine</b><small>Launches Windows Internet Explorer / MSHTML separately. Java compatibility depends on installed Java and IE configuration.</small></div><button class="action-btn" onclick="openSiebelModal()">Open Siebel</button></div>
+            <div class="settings-row"><div><b>Radio / switch legacy TLS bridge</b><small>For old devices only. It disables certificate validation for bridged connections.</small></div><button class="action-btn radio-btn" onclick="showToast('Enter the device URL in the address bar, then use Radio TLS.')">How to use</button></div>
+            <hr style="border-color:#444;margin:12px 0">
+            <button class="action-btn" onclick="importBookmarks()">Import bookmarks</button>
+            <button class="action-btn" onclick="loadChromeExtension()">Load unpacked extension</button>
+            <div style="margin-top:12px"><label>Priority domains</label><div style="display:flex;gap:6px;margin-top:6px"><input id="priority-input" placeholder="example.local" style="flex:1"><button class="action-btn" onclick="addPriorityDomain()">Add</button></div><div id="priority-list" style="margin-top:8px"></div></div>
+          </div>
+        </section>
+        <section id="settings-updates" class="settings-page" style="display:none">
+          <div class="settings-section">
+            <h4>Swift Browser updates</h4>
+            <p id="app-version" style="margin-bottom:8px">Checking installed version...</p>
+            <p id="update-message" style="color:#9aa0a6;margin-bottom:12px">Updates can be checked and installed from here without manually downloading ZIP files.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="action-btn mac-btn" onclick="checkForUpdates()">Check for updates</button>
+              <button id="download-update-btn" class="action-btn" style="display:none" onclick="downloadUpdate()">Download update</button>
+              <button id="install-update-btn" class="action-btn clean-btn" style="display:none" onclick="installUpdate()">Restart and install</button>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   </div>
 
@@ -144,6 +206,7 @@
       hideAllPanels('settings-panel');
       const p = document.getElementById('settings-panel');
       p.style.display = p.style.display === 'block' ? 'none' : 'block';
+      if (p.style.display === 'block') loadSettings();
     }
 
     function convertMac() {
@@ -190,11 +253,11 @@
     }
 
     const WORKSPACE_KEY = 'swift-workspace-tabs-v2';
-    const MAX_LIVE_NON_PINNED_TABS = 1;
+    let settingsPrefs = { sleepInactive: true, maxLive: 1, pinnedDomains: ['whatsapp.com', 'capstone'], restoreWorkspace: true, homePage: 'https://www.google.com', searchEngine: 'google' };
 
     function isPinnedTab(tab) {
       const value = (tab.url || '').toLowerCase();
-      return value.includes('whatsapp.com') || value.includes('capstone');
+      return (settingsPrefs.pinnedDomains || []).some(domain => domain && value.includes(domain.toLowerCase()));
     }
 
     function saveWorkspace() {
@@ -209,7 +272,7 @@
       const config = await ipcRenderer.invoke('get-config');
       renderConfig(config);
       let saved = [];
-      try { saved = JSON.parse(localStorage.getItem(WORKSPACE_KEY) || '[]'); } catch (e) {}
+      try { saved = settingsPrefs.restoreWorkspace ? JSON.parse(localStorage.getItem(WORKSPACE_KEY) || '[]') : []; } catch (e) {}
       if (Array.isArray(saved) && saved.length) {
         saved.forEach(item => {
           if (item && typeof item.url === 'string' && /^https?:\/\//i.test(item.url)) {
@@ -218,7 +281,7 @@
         });
         if (tabs.length) return;
       }
-      createNewTab('https://www.google.com');
+      createNewTab(settingsPrefs.homePage || 'https://www.google.com');
     }
 
     function renderConfig(config) {
@@ -288,7 +351,7 @@
 
     function enforceTabMemoryLimit() {
       const live = tabs.filter(t => t.webview && !isPinnedTab(t) && t.id !== activeTabId);
-      while (live.length > MAX_LIVE_NON_PINNED_TABS) {
+      while (live.length > (Number(settingsPrefs.maxLive) || 0)) {
         sleepTab(live.shift());
       }
     }
@@ -312,7 +375,7 @@
       const next = tabs.find(t => t.id === tabId);
       if (!next) return;
       const previous = tabs.find(t => t.id === activeTabId);
-      if (previous && previous.id !== tabId && !isPinnedTab(previous)) {
+      if (settingsPrefs.sleepInactive && previous && previous.id !== tabId && !isPinnedTab(previous)) {
         if (previous.webview) {
           try {
             previous.url = previous.webview.getURL() || previous.url;
@@ -356,15 +419,27 @@
 
     function navigateToUrl() {
       let input = document.getElementById('url-input').value.trim();
-      if (!input.startsWith('http://') && !input.startsWith('https://')) {
-        input = input.includes('.') ? 'https://' + input : 'https://www.google.com/search?q=' + encodeURIComponent(input);
+      if (!input) return;
+      if (!/^https?:\/\//i.test(input)) {
+        input = input.includes('.') || /^\d{1,3}(\.\d{1,3}){3}(:\d+)?$/.test(input)
+          ? 'http://' + input
+          : 'https://' + ({google:'www.google.com/search?q=',bing:'www.bing.com/search?q=',duckduckgo:'duckduckgo.com/?q='}[settingsPrefs.searchEngine || 'google']) + encodeURIComponent(input);
       }
+      try { new URL(input); } catch (e) { showToast('Invalid address. Check the URL and try again.'); return; }
       navigateActiveTab(input);
     }
 
     function navigateActiveTab(url) {
-      const wv = getActiveWebview();
-      if (wv) wv.loadURL(url);
+      const tab = tabs.find(t => t.id === activeTabId);
+      if (!tab) { showToast('No active tab. Open a new tab first.'); return; }
+      tab.url = url;
+      const wv = tab.webview || attachWebview(tab);
+      document.getElementById('url-input').value = url;
+      saveWorkspace();
+      try {
+        const result = wv.loadURL(url);
+        if (result && result.catch) result.catch(err => showToast('Navigation failed: ' + err.message));
+      } catch (err) { showToast('Navigation failed: ' + err.message); }
     }
 
     function goBack() { const wv = getActiveWebview(); if (wv && wv.canGoBack()) wv.goBack(); }
@@ -408,6 +483,79 @@
       const extName = await ipcRenderer.invoke('load-extension');
       if (extName) showToast(`Extension "${extName}" Loaded!`);
     }
+
+ 
+    function showSettingsSection(name, button) {
+      document.querySelectorAll('.settings-page').forEach(el => el.style.display = 'none');
+      const target = document.getElementById('settings-' + name);
+      if (target) target.style.display = 'block';
+      document.querySelectorAll('.settings-nav button').forEach(el => el.classList.remove('selected'));
+      if (button) button.classList.add('selected');
+    }
+
+    function loadSettings() {
+      try { settingsPrefs = Object.assign(settingsPrefs, JSON.parse(localStorage.getItem('swift-settings-v1') || '{}')); } catch (e) {}
+      document.getElementById('pref-restore').checked = settingsPrefs.restoreWorkspace !== false;
+      document.getElementById('pref-home').value = settingsPrefs.homePage || 'https://www.google.com';
+      document.getElementById('pref-search').value = settingsPrefs.searchEngine || 'google';
+      document.getElementById('pref-sleep').checked = settingsPrefs.sleepInactive !== false;
+      document.getElementById('pref-max-live').value = String(settingsPrefs.maxLive == null ? 1 : settingsPrefs.maxLive);
+      document.getElementById('pref-pinned').value = (settingsPrefs.pinnedDomains || ['whatsapp.com','capstone']).join('\n');
+      ipcRenderer.invoke('get-app-version').then(v => document.getElementById('app-version').innerText = 'Installed version: ' + v);
+    }
+
+    function saveSettings() {
+      const home = document.getElementById('pref-home').value.trim();
+      settingsPrefs = {
+        restoreWorkspace: document.getElementById('pref-restore').checked,
+        homePage: /^https?:\/\//i.test(home) ? home : 'https://' + home,
+        searchEngine: document.getElementById('pref-search').value,
+        sleepInactive: document.getElementById('pref-sleep').checked,
+        maxLive: Number(document.getElementById('pref-max-live').value),
+        pinnedDomains: document.getElementById('pref-pinned').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean)
+      };
+      localStorage.setItem('swift-settings-v1', JSON.stringify(settingsPrefs));
+      showToast('Settings saved');
+      enforceTabMemoryLimit();
+    }
+
+    async function checkForUpdates() {
+      const msg = document.getElementById('update-message');
+      msg.innerText = 'Checking for updates...';
+      const result = await ipcRenderer.invoke('check-for-updates');
+      if (!result.ok) msg.innerText = 'Update check failed: ' + result.error;
+    }
+    async function downloadUpdate() {
+      document.getElementById('update-message').innerText = 'Starting update download...';
+      const result = await ipcRenderer.invoke('download-update');
+      if (!result.ok) document.getElementById('update-message').innerText = 'Download failed: ' + result.error;
+    }
+    function installUpdate() { ipcRenderer.invoke('install-update'); }
+
+    ipcRenderer.on('update-status', (_event, data) => {
+      const msg = document.getElementById('update-message');
+      if (!msg) return;
+      const downloadBtn = document.getElementById('download-update-btn');
+      const installBtn = document.getElementById('install-update-btn');
+      if (data.status === 'checking') msg.innerText = 'Checking GitHub for a published update...';
+      if (data.status === 'available') { msg.innerText = 'Version ' + data.version + ' is available.'; downloadBtn.style.display = 'inline-flex'; }
+      if (data.status === 'not-available') msg.innerText = 'You are up to date.';
+      if (data.status === 'downloading') msg.innerText = 'Downloading update: ' + data.percent + '%';
+      if (data.status === 'downloaded') { msg.innerText = 'Update downloaded. Restart to install version ' + data.version + '.'; installBtn.style.display = 'inline-flex'; }
+      if (data.status === 'error') msg.innerText = 'Update error: ' + data.message;
+    });
+
+    document.getElementById('url-input').addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        const field = event.currentTarget;
+        const pasted = clipboard.readText();
+        const start = field.selectionStart == null ? field.value.length : field.selectionStart;
+        const end = field.selectionEnd == null ? field.value.length : field.selectionEnd;
+        field.value = field.value.slice(0, start) + pasted + field.value.slice(end);
+        field.setSelectionRange(start + pasted.length, start + pasted.length);
+      }
+    });
 
     initBrowser();
   </script>
