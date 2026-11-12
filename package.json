@@ -14,7 +14,10 @@
       "github"
     ],
     "win": {
-      "target": "nsis"
+      "target": [
+        "nsis",
+        "zip"
+      ]
     }
   },
   "dependencies": {
