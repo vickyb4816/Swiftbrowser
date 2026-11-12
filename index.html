@@ -10,6 +10,7 @@
     #tab-bar { display: flex; align-items: center; background: #202124; padding: 6px 8px 0 8px; gap: 4px; overflow-x: auto; }
     .tab { display: flex; align-items: center; justify-content: space-between; background: #292a2d; color: #9aa0a6; padding: 7px 12px; border-radius: 8px 8px 0 0; min-width: 130px; max-width: 200px; font-size: 12px; cursor: pointer; transition: 0.15s; }
     .tab.active { background: #35363a; color: #fff; font-weight: 500; border-top: 2px solid #8ab4f8; }
+    .tab.sleeping .tab-title { color: #a8c7fa; }
     .tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
     .close-tab { margin-left: 8px; font-weight: bold; border-radius: 50%; padding: 0 4px; }
     .close-tab:hover { background: #5f6368; color: #fff; }
@@ -188,9 +189,35 @@
       showToast('📡 Switched Tab to Legacy TLS 1.0 Radio Bridge!');
     }
 
+    const WORKSPACE_KEY = 'swift-workspace-tabs-v2';
+    const MAX_LIVE_NON_PINNED_TABS = 1;
+
+    function isPinnedTab(tab) {
+      const value = (tab.url || '').toLowerCase();
+      return value.includes('whatsapp.com') || value.includes('capstone');
+    }
+
+    function saveWorkspace() {
+      try {
+        localStorage.setItem(WORKSPACE_KEY, JSON.stringify(
+          tabs.map(t => ({ url: t.url, title: t.title || 'Office Tab' }))
+        ));
+      } catch (e) { console.log('Workspace save error', e); }
+    }
+
     async function initBrowser() {
       const config = await ipcRenderer.invoke('get-config');
       renderConfig(config);
+      let saved = [];
+      try { saved = JSON.parse(localStorage.getItem(WORKSPACE_KEY) || '[]'); } catch (e) {}
+      if (Array.isArray(saved) && saved.length) {
+        saved.forEach(item => {
+          if (item && typeof item.url === 'string' && /^https?:\/\//i.test(item.url)) {
+            createNewTab(item.url, item.title || 'Office Tab', true);
+          }
+        });
+        if (tabs.length) return;
+      }
       createNewTab('https://www.google.com');
     }
 
@@ -215,46 +242,99 @@
       });
     }
 
-    function createNewTab(url) {
-      const tabId = 'tab-' + Date.now();
+    function attachWebview(tab) {
+      if (tab.webview) return tab.webview;
+      const webview = document.createElement('webview');
+      webview.id = tab.id;
+      webview.setAttribute('partition', 'persist:swift');
+      webview.setAttribute('allowpopups', '');
+      webview.src = tab.url;
+      document.getElementById('views-container').appendChild(webview);
+      tab.webview = webview;
+
+      webview.addEventListener('page-title-updated', (e) => {
+        tab.title = e.title || tab.title;
+        tab.tabEl.querySelector('.tab-title').innerText = tab.title;
+        saveWorkspace();
+      });
+      webview.addEventListener('did-navigate', (e) => {
+        tab.url = e.url;
+        if (activeTabId === tab.id) document.getElementById('url-input').value = e.url;
+        saveWorkspace();
+      });
+      webview.addEventListener('did-navigate-in-page', (e) => {
+        tab.url = e.url;
+        if (activeTabId === tab.id) document.getElementById('url-input').value = e.url;
+        saveWorkspace();
+      });
+      webview.addEventListener('dom-ready', () => {
+        tab.tabEl.classList.remove('sleeping');
+      });
+      return webview;
+    }
+
+    function sleepTab(tab) {
+      if (!tab || !tab.webview || isPinnedTab(tab) || tab.id === activeTabId) return;
+      try {
+        tab.url = tab.webview.getURL() || tab.url;
+        tab.title = tab.webview.getTitle() || tab.title;
+      } catch (e) {}
+      tab.webview.remove();
+      tab.webview = null;
+      tab.tabEl.classList.add('sleeping');
+      tab.tabEl.querySelector('.tab-title').innerText = '☾ ' + (tab.title || 'Sleeping tab');
+      saveWorkspace();
+    }
+
+    function enforceTabMemoryLimit() {
+      const live = tabs.filter(t => t.webview && !isPinnedTab(t) && t.id !== activeTabId);
+      while (live.length > MAX_LIVE_NON_PINNED_TABS) {
+        sleepTab(live.shift());
+      }
+    }
+
+    function createNewTab(url, title, restoring) {
+      const tabId = 'tab-' + Date.now() + '-' + Math.floor(Math.random() * 10000);
       const tabEl = document.createElement('div');
       tabEl.className = 'tab';
       tabEl.id = 'btn-' + tabId;
-      tabEl.innerHTML = `<span class="tab-title">New Tab</span><span class="close-tab" onclick="closeTab(event, '${tabId}')">&times;</span>`;
+      tabEl.innerHTML = `<span class="tab-title">${title || 'Loading...'}</span><span class="close-tab" onclick="closeTab(event, '${tabId}')">&times;</span>`;
       tabEl.onclick = () => switchTab(tabId);
       document.getElementById('tab-bar').insertBefore(tabEl, document.getElementById('new-tab-btn'));
 
-      const webview = document.createElement('webview');
-      webview.id = tabId;
-      webview.src = url;
-      webview.setAttribute('partition', 'persist:swift'); 
-      webview.setAttribute('allowpopups', '');
-      document.getElementById('views-container').appendChild(webview);
-
-      webview.addEventListener('page-title-updated', (e) => {
-        tabEl.querySelector('.tab-title').innerText = e.title;
-      });
-      webview.addEventListener('did-navigate', (e) => {
-        if (activeTabId === tabId) document.getElementById('url-input').value = e.url;
-      });
-      webview.addEventListener('did-navigate-in-page', (e) => {
-        if (activeTabId === tabId) document.getElementById('url-input').value = e.url;
-      });
-
-      tabs.push({ id: tabId, webview, tabEl });
+      const tab = { id: tabId, url, title: title || 'Office Tab', webview: null, tabEl };
+      tabs.push(tab);
       switchTab(tabId);
+      if (!restoring) saveWorkspace();
     }
 
     function switchTab(tabId) {
+      const next = tabs.find(t => t.id === tabId);
+      if (!next) return;
+      const previous = tabs.find(t => t.id === activeTabId);
+      if (previous && previous.id !== tabId && !isPinnedTab(previous)) {
+        if (previous.webview) {
+          try {
+            previous.url = previous.webview.getURL() || previous.url;
+            previous.title = previous.webview.getTitle() || previous.title;
+          } catch (e) {}
+          previous.webview.remove();
+          previous.webview = null;
+          previous.tabEl.classList.add('sleeping');
+          previous.tabEl.querySelector('.tab-title').innerText = '☾ ' + previous.title;
+        }
+      }
+
       activeTabId = tabId;
       tabs.forEach(t => {
-        const isCurrent = t.id === tabId;
-        t.tabEl.classList.toggle('active', isCurrent);
-        t.webview.classList.toggle('active', isCurrent);
-        if (isCurrent) {
-          document.getElementById('url-input').value = t.webview.getURL() || t.webview.src;
-        }
+        t.tabEl.classList.toggle('active', t.id === tabId);
+        if (t.id === tabId) t.tabEl.querySelector('.tab-title').innerText = t.title || 'Loading...';
       });
+      const webview = attachWebview(next);
+      webview.classList.add('active');
+      document.getElementById('url-input').value = next.url;
+      enforceTabMemoryLimit();
+      saveWorkspace();
     }
 
     function closeTab(e, tabId) {
@@ -262,8 +342,9 @@
       const idx = tabs.findIndex(t => t.id === tabId);
       if (idx === -1) return;
       tabs[idx].tabEl.remove();
-      tabs[idx].webview.remove();
+      if (tabs[idx].webview) tabs[idx].webview.remove();
       tabs.splice(idx, 1);
+      saveWorkspace();
       if (tabs.length === 0) createNewTab('https://www.google.com');
       else if (activeTabId === tabId) switchTab(tabs[Math.max(0, idx - 1)].id);
     }
