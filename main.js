@@ -78,36 +78,30 @@ app.whenReady().then(async () => {
   mainWindow.on('page-title-updated', (e) => e.preventDefault());
 
   // ==========================================
-  // AUTO UPDATER LOGIC
+  // IN-APP AUTO UPDATER
+  // Requires a published GitHub Release with latest.yml.
   // ==========================================
   autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
 
-  autoUpdater.on('update-available', async (info) => {
-    const { response } = await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update Available',
-      message: `A new version (${info.version}) of Swift Browser is available.\n\nWould you like to update now?`,
-      buttons: ['Update Now', 'Ignore']
-    });
-    if (response === 0) {
-      mainWindow.webContents.executeJavaScript(`showToast('Downloading update... Please wait.')`).catch(()=>{});
-      autoUpdater.downloadUpdate();
+  function sendUpdateStatus(payload) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update-status', payload);
     }
-  });
+  }
 
-  autoUpdater.on('update-downloaded', async () => {
-    await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update Ready',
-      message: 'The update has been downloaded. The browser will now restart to apply it.',
-      buttons: ['Restart Now']
-    });
-    autoUpdater.quitAndInstall();
-  });
+  autoUpdater.on('checking-for-update', () => sendUpdateStatus({ status: 'checking' }));
+  autoUpdater.on('update-available', (info) => sendUpdateStatus({ status: 'available', version: info.version }));
+  autoUpdater.on('update-not-available', (info) => sendUpdateStatus({ status: 'not-available', version: info.version }));
+  autoUpdater.on('download-progress', (progress) => sendUpdateStatus({
+    status: 'downloading', percent: Math.round(progress.percent || 0)
+  }));
+  autoUpdater.on('update-downloaded', (info) => sendUpdateStatus({ status: 'downloaded', version: info.version }));
+  autoUpdater.on('error', (error) => sendUpdateStatus({ status: 'error', message: error.message }));
 
   setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(err => console.log('Update check error', err));
-  }, 5000);
+    autoUpdater.checkForUpdates().catch(err => sendUpdateStatus({ status: 'error', message: err.message }));
+  }, 8000);
 });
 
 // ==========================================
@@ -141,6 +135,24 @@ ipcMain.handle('load-extension', async () => {
     return ext.name;
   }
   return null;
+});
+
+ipcMain.handle('get-app-version', () => app.getVersion());
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return { ok: true, version: result && result.updateInfo ? result.updateInfo.version : null };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+});
+ipcMain.handle('download-update', async () => {
+  try { await autoUpdater.downloadUpdate(); return { ok: true }; }
+  catch (error) { return { ok: false, error: error.message }; }
+});
+ipcMain.handle('install-update', () => {
+  autoUpdater.quitAndInstall();
+  return { ok: true };
 });
 
 ipcMain.handle('get-config', () => loadConfig());
