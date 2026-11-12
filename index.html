@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Swift Browser</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; user-select: none; }
+    body { display: flex; flex-direction: column; height: 100vh; background: #202124; color: #fff; overflow: hidden; }
+    
+    #tab-bar { display: flex; align-items: center; background: #202124; padding: 6px 8px 0 8px; gap: 4px; overflow-x: auto; }
+    .tab { display: flex; align-items: center; justify-content: space-between; background: #292a2d; color: #9aa0a6; padding: 7px 12px; border-radius: 8px 8px 0 0; min-width: 130px; max-width: 200px; font-size: 12px; cursor: pointer; transition: 0.15s; }
+    .tab.active { background: #35363a; color: #fff; font-weight: 500; border-top: 2px solid #8ab4f8; }
+    .tab-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+    .close-tab { margin-left: 8px; font-weight: bold; border-radius: 50%; padding: 0 4px; }
+    .close-tab:hover { background: #5f6368; color: #fff; }
+    #new-tab-btn { background: transparent; border: none; color: #9aa0a6; font-size: 20px; padding: 2px 10px; cursor: pointer; border-radius: 50%; }
+    #new-tab-btn:hover { background: #35363a; color: #fff; }
+
+    #toolbar { display: flex; align-items: center; background: #35363a; padding: 6px 10px; gap: 6px; border-bottom: 1px solid #202124; }
+    .nav-btn { background: transparent; border: none; color: #e8eaed; font-size: 15px; padding: 5px 8px; border-radius: 50%; cursor: pointer; }
+    .nav-btn:hover { background: #4a4b50; }
+    #url-input { flex: 1; background: #202124; border: 1px solid #5f6368; color: #fff; border-radius: 20px; padding: 7px 14px; font-size: 13px; outline: none; user-select: text; }
+    #url-input:focus { border-color: #8ab4f8; }
+    .action-btn { background: #292a2d; border: 1px solid #5f6368; color: #e8eaed; padding: 6px 10px; border-radius: 14px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .action-btn:hover { background: #4a4b50; }
+    .clean-btn { background: #1e8e3e; border-color: #1e8e3e; font-weight: 600; }
+    .mac-btn { background: #1a73e8; border-color: #1a73e8; font-weight: 600; }
+    .radio-btn { background: #e37400; border-color: #e37400; font-weight: 600; }
+
+    #bookmarks-bar { display: flex; align-items: center; background: #35363a; padding: 4px 12px; gap: 6px; border-bottom: 1px solid #202124; overflow-x: auto; font-size: 11px; }
+    .bookmark-item { background: #292a2d; padding: 3px 9px; border-radius: 10px; cursor: pointer; white-space: nowrap; color: #e8eaed; }
+    .bookmark-item:hover { background: #4a4b50; }
+
+    /* Floating Panels */
+    .floating-panel { display: none; position: fixed; right: 15px; top: 90px; width: 340px; background: #292a2d; border: 1px solid #5f6368; border-radius: 8px; padding: 15px; z-index: 999; box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+    .floating-panel h4 { margin-bottom: 8px; font-size: 14px; color: #8ab4f8; }
+    .domain-tag { display: inline-block; background: #35363a; padding: 3px 8px; border-radius: 4px; font-size: 11px; margin: 3px; border: 1px solid #5f6368; }
+    
+    .mac-row { display: flex; justify-content: space-between; align-items: center; background: #202124; padding: 6px 10px; border-radius: 4px; margin-bottom: 6px; font-family: monospace; font-size: 12px; border: 1px solid #3c4043; cursor: pointer; }
+    .mac-row:hover { border-color: #8ab4f8; }
+
+    #views-container { flex: 1; position: relative; background: #fff; }
+    webview { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; }
+    webview.active { display: flex; }
+
+    #toast { display: none; position: fixed; bottom: 20px; right: 20px; background: #1e8e3e; color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 1000; }
+  </style>
+</head>
+<body>
+
+  <div id="tab-bar">
+    <button id="new-tab-btn" onclick="createNewTab('https://www.google.com')" title="New Tab">+</button>
+  </div>
+
+  <div id="toolbar">
+    <button class="nav-btn" onclick="goBack()" title="Back">&#8592;</button>
+    <button class="nav-btn" onclick="goForward()" title="Forward">&#8594;</button>
+    <button class="nav-btn" onclick="reloadTab()" title="Reload">&#8635;</button>
+    <input type="text" id="url-input" placeholder="Enter URL or IP (e.g., cnmaestro.com or 10.x.x.x)" onkeydown="if(event.key==='Enter') navigateToUrl()">
+    <button class="action-btn radio-btn" onclick="openRadioTlsBridge()" title="Open Current URL with Legacy TLS 1.0 (For Radios/Switches)">&#128225; Radio TLS 1.0</button>
+    <button class="action-btn mac-btn" onclick="toggleMacPanel()" title="Built-in Zero-RAM MAC Converter">&#128295; MAC Tool</button>
+    <button class="action-btn" onclick="openSiebelModal()" title="Open Siebel with Oracle Java IE Engine">&#9749; Siebel Java</button>
+    <button class="action-btn" onclick="bookmarkCurrent()" title="Save Bookmark">&#9733;</button>
+    <button class="action-btn clean-btn" onclick="cleanCache()">&#9889; Clean RAM</button>
+    <button class="action-btn" onclick="toggleSettings()">&#9881;</button>
+  </div>
+
+  <div id="bookmarks-bar"></div>
+
+  <!-- Built-in Zero-RAM MAC Address Converter Popup -->
+  <div id="mac-panel" class="floating-panel">
+    <h4>&#128295; Instant MAC Converter (0 MB RAM)</h4>
+    <p style="font-size:11px; color:#9aa0a6; margin-bottom:8px;">Type any MAC or ESN. Click any result row to copy it.</p>
+    <input type="text" id="mac-input" placeholder="e.g. 00-04-56-AA-BB-CC" oninput="convertMac()" style="width:100%; padding:7px; border-radius:4px; border:1px solid #5f6368; background:#202124; color:#fff; margin-bottom:10px; user-select:text;">
+    <div id="mac-results">
+      <div class="mac-row" onclick="copyText(this)"><span>Colon (:):</span> <strong id="mac-colon">--</strong></div>
+      <div class="mac-row" onclick="copyText(this)"><span>Dash (-):</span> <strong id="mac-dash">--</strong></div>
+      <div class="mac-row" onclick="copyText(this)"><span>Cisco (.):</span> <strong id="mac-cisco">--</strong></div>
+      <div class="mac-row" onclick="copyText(this)"><span>Raw (Plain):</span> <strong id="mac-raw">--</strong></div>
+      <div class="mac-row" onclick="copyText(this)"><span>Lower (:):</span> <strong id="mac-lower">--</strong></div>
+    </div>
+  </div>
+
+  <!-- Siebel Java Engine Launcher -->
+  <div id="siebel-panel" class="floating-panel">
+    <h4>&#9749; Siebel (Oracle Java / IE Mode)</h4>
+    <p style="font-size:11px; color:#9aa0a6; margin-bottom:8px;">Launches Windows native MSHTML engine directly for Oracle Java ActiveX without opening heavy browsers.</p>
+    <input type="text" id="siebel-url" placeholder="Paste your Siebel URL here..." style="width:100%; padding:7px; border-radius:4px; border:1px solid #5f6368; background:#202124; color:#fff; margin-bottom:8px; user-select:text;">
+    <button class="action-btn mac-btn" style="width:100%; justify-content:center;" onclick="launchSiebel()">Launch Siebel Native Engine</button>
+  </div>
+
+  <!-- Office Settings Panel -->
+  <div id="settings-panel" class="floating-panel">
+    <h4>Zero-Freeze Office Base URLs</h4>
+    <p style="font-size:11px; color:#9aa0a6; margin-bottom:8px;">Core URLs kept awake with shared low-RAM pooling:</p>
+    <div style="display:flex; gap:5px; margin-bottom:10px;">
+      <input type="text" id="priority-input" placeholder="cnmaestro.com" style="flex:1; padding:5px; border-radius:4px; border:1px solid #5f6368; background:#202124; color:#fff;">
+      <button class="action-btn" onclick="addPriorityDomain()">Add</button>
+    </div>
+    <div id="priority-list" style="margin-bottom:14px;"></div>
+    <hr style="border-color:#35363a; margin:10px 0;">
+    <h4>Chrome Extensions & Bookmarks</h4>
+    <div style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+      <button class="action-btn" onclick="importBookmarks()">&#128194; Import Chrome Bookmarks (HTML)</button>
+      <button class="action-btn" onclick="loadChromeExtension()">&#129513; Load Unpacked Chrome Extension</button>
+    </div>
+  </div>
+
+  <div id="views-container"></div>
+  <div id="toast"></div>
+
+  <script>
+    const { ipcRenderer, clipboard } = require('electron');
+    let tabs = [];
+    let activeTabId = null;
+
+    window.showToast = function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.display = 'block';
+      setTimeout(() => t.style.display = 'none', 3000);
+    }
+
+    function hideAllPanels(exceptId) {
+      ['mac-panel', 'settings-panel', 'siebel-panel'].forEach(id => {
+        if (id !== exceptId) document.getElementById(id).style.display = 'none';
+      });
+    }
+
+    function toggleMacPanel() {
+      hideAllPanels('mac-panel');
+      const p = document.getElementById('mac-panel');
+      p.style.display = p.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function openSiebelModal() {
+      hideAllPanels('siebel-panel');
+      const p = document.getElementById('siebel-panel');
+      p.style.display = p.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function toggleSettings() {
+      hideAllPanels('settings-panel');
+      const p = document.getElementById('settings-panel');
+      p.style.display = p.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function convertMac() {
+      const raw = document.getElementById('mac-input').value.replace(/[^a-fA-F0-9]/g, '').toUpperCase();
+      if (raw.length !== 12) {
+        ['mac-colon', 'mac-dash', 'mac-cisco', 'mac-raw', 'mac-lower'].forEach(id => document.getElementById(id).innerText = 'Enter 12 hex digits');
+        return;
+      }
+      const pairs = raw.match(/.{1,2}/g);
+      const quads = raw.match(/.{1,4}/g);
+      document.getElementById('mac-colon').innerText = pairs.join(':');
+      document.getElementById('mac-dash').innerText = pairs.join('-');
+      document.getElementById('mac-cisco').innerText = quads.join('.').toLowerCase();
+      document.getElementById('mac-raw').innerText = raw;
+      document.getElementById('mac-lower').innerText = pairs.join(':').toLowerCase();
+    }
+
+    function copyText(rowEl) {
+      const val = rowEl.querySelector('strong').innerText;
+      if (val && !val.includes('Enter') && val !== '--') {
+        clipboard.writeText(val);
+        showToast('Copied: ' + val);
+      }
+    }
+
+    async function launchSiebel() {
+      const url = document.getElementById('siebel-url').value.trim();
+      await ipcRenderer.invoke('launch-siebel-ie', url);
+      document.getElementById('siebel-panel').style.display = 'none';
+      showToast('Launching Siebel in Native Java/IE Engine...');
+    }
+
+    function openRadioTlsBridge() {
+      let currentInput = document.getElementById('url-input').value.trim();
+      if (!currentInput) return;
+      if (currentInput.includes('localhost:8089/')) {
+        showToast('Already running in Radio TLS 1.0 Mode!');
+        return;
+      }
+      if (!currentInput.startsWith('http')) currentInput = 'https://' + currentInput;
+      const bridgedUrl = 'http://localhost:8089/' + currentInput;
+      navigateActiveTab(bridgedUrl);
+      showToast('📡 Switched Tab to Legacy TLS 1.0 Radio Bridge!');
+    }
+
+    async function initBrowser() {
+      const config = await ipcRenderer.invoke('get-config');
+      renderConfig(config);
+      createNewTab('https://www.google.com');
+    }
+
+    function renderConfig(config) {
+      const bBar = document.getElementById('bookmarks-bar');
+      bBar.innerHTML = '';
+      config.bookmarks.forEach(b => {
+        const el = document.createElement('div');
+        el.className = 'bookmark-item';
+        el.innerText = b.title;
+        el.onclick = () => navigateActiveTab(b.url);
+        bBar.appendChild(el);
+      });
+
+      const pList = document.getElementById('priority-list');
+      pList.innerHTML = '';
+      config.priorityDomains.forEach(d => {
+        const span = document.createElement('span');
+        span.className = 'domain-tag';
+        span.innerText = '*.' + d;
+        pList.appendChild(span);
+      });
+    }
+
+    function createNewTab(url) {
+      const tabId = 'tab-' + Date.now();
+      const tabEl = document.createElement('div');
+      tabEl.className = 'tab';
+      tabEl.id = 'btn-' + tabId;
+      tabEl.innerHTML = `<span class="tab-title">New Tab</span><span class="close-tab" onclick="closeTab(event, '${tabId}')">&times;</span>`;
+      tabEl.onclick = () => switchTab(tabId);
+      document.getElementById('tab-bar').insertBefore(tabEl, document.getElementById('new-tab-btn'));
+
+      const webview = document.createElement('webview');
+      webview.id = tabId;
+      webview.src = url;
+      webview.setAttribute('partition', 'persist:swift'); 
+      webview.setAttribute('allowpopups', '');
+      document.getElementById('views-container').appendChild(webview);
+
+      webview.addEventListener('page-title-updated', (e) => {
+        tabEl.querySelector('.tab-title').innerText = e.title;
+      });
+      webview.addEventListener('did-navigate', (e) => {
+        if (activeTabId === tabId) document.getElementById('url-input').value = e.url;
+      });
+      webview.addEventListener('did-navigate-in-page', (e) => {
+        if (activeTabId === tabId) document.getElementById('url-input').value = e.url;
+      });
+
+      tabs.push({ id: tabId, webview, tabEl });
+      switchTab(tabId);
+    }
+
+    function switchTab(tabId) {
+      activeTabId = tabId;
+      tabs.forEach(t => {
+        const isCurrent = t.id === tabId;
+        t.tabEl.classList.toggle('active', isCurrent);
+        t.webview.classList.toggle('active', isCurrent);
+        if (isCurrent) {
+          document.getElementById('url-input').value = t.webview.getURL() || t.webview.src;
+        }
+      });
+    }
+
+    function closeTab(e, tabId) {
+      e.stopPropagation();
+      const idx = tabs.findIndex(t => t.id === tabId);
+      if (idx === -1) return;
+      tabs[idx].tabEl.remove();
+      tabs[idx].webview.remove();
+      tabs.splice(idx, 1);
+      if (tabs.length === 0) createNewTab('https://www.google.com');
+      else if (activeTabId === tabId) switchTab(tabs[Math.max(0, idx - 1)].id);
+    }
+
+    function getActiveWebview() {
+      const t = tabs.find(t => t.id === activeTabId);
+      return t ? t.webview : null;
+    }
+
+    function navigateToUrl() {
+      let input = document.getElementById('url-input').value.trim();
+      if (!input.startsWith('http://') && !input.startsWith('https://')) {
+        input = input.includes('.') ? 'https://' + input : 'https://www.google.com/search?q=' + encodeURIComponent(input);
+      }
+      navigateActiveTab(input);
+    }
+
+    function navigateActiveTab(url) {
+      const wv = getActiveWebview();
+      if (wv) wv.loadURL(url);
+    }
+
+    function goBack() { const wv = getActiveWebview(); if (wv && wv.canGoBack()) wv.goBack(); }
+    function goForward() { const wv = getActiveWebview(); if (wv && wv.canGoForward()) wv.goForward(); }
+    function reloadTab() { const wv = getActiveWebview(); if (wv) wv.reload(); }
+
+    async function cleanCache() {
+      await ipcRenderer.invoke('clean-cache-only');
+      showToast('⚡ RAM & Cache Flushed! Active Logins Preserved.');
+    }
+
+    async function bookmarkCurrent() {
+      const wv = getActiveWebview();
+      if (!wv) return;
+      const config = await ipcRenderer.invoke('add-bookmark', {
+        title: wv.getTitle().substring(0, 20) || 'Office Site',
+        url: wv.getURL()
+      });
+      renderConfig(config);
+      showToast('★ Added to Bookmarks Bar');
+    }
+
+    async function addPriorityDomain() {
+      const val = document.getElementById('priority-input').value.trim();
+      if (!val) return;
+      const config = await ipcRenderer.invoke('add-priority-domain', val);
+      document.getElementById('priority-input').value = '';
+      renderConfig(config);
+      showToast(`Boosted *.${val}`);
+    }
+
+    async function importBookmarks() {
+      const config = await ipcRenderer.invoke('import-bookmarks');
+      if (config) {
+        renderConfig(config);
+        showToast('Bookmarks Imported Successfully!');
+      }
+    }
+
+    async function loadChromeExtension() {
+      const extName = await ipcRenderer.invoke('load-extension');
+      if (extName) showToast(`Extension "${extName}" Loaded!`);
+    }
+
+    initBrowser();
+  </script>
+</body>
+</html>
