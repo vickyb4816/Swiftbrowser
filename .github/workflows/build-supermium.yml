@@ -55,7 +55,7 @@ jobs:
             if (-not (Test-Path (Join-Path $net2 $assembly))) { throw ".NET 2.0 reference assembly missing: $assembly" }
           }
           New-Item -ItemType Directory -Force -Path "staging\swift-launcher", "dist" | Out-Null
-          & $csc /nologo /nostdlib /target:winexe /platform:x64 /out:staging\SwiftBrowser.exe /reference:"$net2\mscorlib.dll" /reference:"$net2\System.dll" /reference:"$net2\System.Windows.Forms.dll" swift-launcher\SwiftBrowserLauncher.cs
+          & $csc /nologo /noconfig /nostdlib /target:winexe /platform:x64 /out:staging\SwiftBrowser.exe /reference:"$net2\mscorlib.dll" /reference:"$net2\System.dll" /reference:"$net2\System.Windows.Forms.dll" swift-launcher\SwiftBrowserLauncher.cs
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path "staging\SwiftBrowser.exe")) { throw "SwiftBrowser.exe compilation failed" }
           Copy-Item "swift-launcher\SwiftBrowser.ps1" "staging\swift-launcher\SwiftBrowser.ps1"
           Copy-Item "SwiftBrowser.cmd" "staging\SwiftBrowser.cmd"
