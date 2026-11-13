@@ -5,9 +5,6 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const https = require('https');
-const tls = require('tls');
-
-tls.DEFAULT_MIN_VERSION = 'TLSv1'; 
 
 // ==========================================
 // 1. CONSERVATIVE MEMORY AND SECURITY DEFAULTS
