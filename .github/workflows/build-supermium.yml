@@ -1,0 +1,96 @@
+name: Build Swift Browser (Supermium)
+
+on:
+  push:
+    branches:
+      - fresh/supermium-swift-1.2.0
+    paths:
+      - ".github/workflows/build-supermium.yml"
+      - "swift-launcher/**"
+      - "packaging/**"
+      - "SwiftBrowser.cmd"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout fresh browser branch
+        uses: actions/checkout@v4
+        with:
+          ref: fresh/supermium-swift-1.2.0
+
+      - name: Download pinned official Supermium x64 portable build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://github.com/win32ss/supermium/releases/download/v150-r2.02/supermium_150_64_nonsetup.zip"
+          $zip = Join-Path $env:RUNNER_TEMP "supermium.zip"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          $expected = "50498112ed7107df9ec3b59794850eff5a9c08918895308bcb529171a5e9a007"
+          if ($actual -ne $expected) { throw "Supermium SHA-256 mismatch. Expected $expected, got $actual" }
+          New-Item -ItemType Directory -Force -Path "staging\Supermium" | Out-Null
+          Expand-Archive -LiteralPath $zip -DestinationPath "staging\Supermium" -Force
+          $chrome = Get-ChildItem -LiteralPath "staging\Supermium" -Filter "chrome.exe" -File -Recurse | Select-Object -First 1
+          if ($null -eq $chrome) { throw "Official portable archive did not contain chrome.exe" }
+          "Verified Supermium archive SHA-256: $actual"
+          "Browser executable: $($chrome.FullName)"
+
+      - name: Assemble Swift Browser package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path "staging\swift-launcher", "dist" | Out-Null
+          Copy-Item "swift-launcher\SwiftBrowser.ps1" "staging\swift-launcher\SwiftBrowser.ps1"
+          Copy-Item "SwiftBrowser.cmd" "staging\SwiftBrowser.cmd"
+          @"
+          Swift Browser 1.2.0
+          Made by Vicky Bhalerao
+
+          Browser engine: Supermium 150.0.7871.255 R2.02 (x64)
+          Upstream project: https://github.com/win32ss/supermium
+          Upstream release: https://github.com/win32ss/supermium/releases/tag/v150-r2.02
+          The browser engine is the unmodified upstream Supermium distribution.
+          Swift Browser is an independent packaging/launcher project and is not affiliated with or endorsed by the Supermium project.
+          Upstream components remain subject to their respective licenses and notices distributed with the upstream package.
+          TLS policy: TLS 1.2 only, configured at launch. Certificate validation and browser sandbox are not disabled.
+          "@ | Set-Content -Encoding UTF8 "staging\UPSTREAM-NOTICES.txt"
+          $chrome = Get-ChildItem -LiteralPath "staging\Supermium" -Filter "chrome.exe" -File -Recurse | Select-Object -First 1
+          if ($null -eq $chrome) { throw "chrome.exe missing after package assembly" }
+          $version = (Get-Item $chrome.FullName).VersionInfo.ProductVersion
+          "Detected chrome.exe product version: $version"
+          Compress-Archive -Path "staging\*" -DestinationPath "dist\Swift-Browser-1.2.0-win-x64-portable.zip" -CompressionLevel Optimal -Force
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $iscc = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "Inno Setup compiler not found at $iscc" }
+          & $iscc "packaging\SwiftBrowser.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path "dist\Swift-Browser-Setup-1.2.0.exe")) { throw "Installer output was not created" }
+
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem "dist" -File | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content -Encoding ASCII "dist\SHA256SUMS.txt"
+
+      - name: Upload installer and portable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Swift-Browser-1.2.0-Windows-x64
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30
