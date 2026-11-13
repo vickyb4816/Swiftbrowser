@@ -15,7 +15,7 @@ Initial upstream baseline to evaluate: Supermium 150.0.7871.255 R2.02 (tag v150-
 - Do not delete or overwrite the 1.1.5 release or its source history.
 - Keep this work on the rebuild/supermium-1.2.0 branch until the foundation builds and passes tests.
 - Preserve user profile data; migration must be explicit, backed up and reversible.
-- Do not globally disable TLS/certificate validation or weaken browser sandboxing.
+- Keep certificate validation and the browser sandbox enabled. Swift Browser 1.2.0's initial compatibility profile is TLS 1.2 only (minimum and maximum TLS 1.2), using Chromium's `--ssl-version-min=tls1.2` and `--ssl-version-max=tls1.2` switches. Do not enable TLS 1.0/1.1 or globally ignore certificate errors. Keep a documented return to automatic TLS 1.2–1.3 negotiation if a site requires TLS 1.3.
 - Do not promise a RAM ceiling or "fastest browser" without reproducible measurements.
 - Separate features that can ship in 1.2.0 from items requiring a later milestone.
 - Check upstream licensing and notices before distributing modified binaries or source.
@@ -54,8 +54,11 @@ Exit gate: clean install, launch, navigation, downloads, extension installation,
 
 Exit gate: compare idle and multi-tab RAM/CPU with the same test set; ensure protected tabs remain loaded.
 
-## Phase 3 — office legacy compatibility
+## Phase 3 — office device compatibility
 
+- Start with the approved TLS 1.2-only browser profile recorded in `TLS-1.2-COMPATIBILITY-DECISION.md`; verify the actual radio handshakes across multiple models.
+- Do not assume TLS 1.2 alone fixes cipher-suite mismatches; capture/inspect handshake details when a device still fails.
+- Add per-host certificate trust/compatibility controls only where required, without disabling validation globally.
 - Add a per-host legacy-device compatibility profile for explicitly approved private office devices.
 - Prefer installing/trusting the correct internal CA certificate. Provide narrowly scoped certificate exceptions only when necessary and clearly warn about risks.
 - Do not turn off certificate validation globally, and do not silently weaken TLS for public websites.
