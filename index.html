@@ -429,7 +429,7 @@ capstone</textarea>
         const isDomain = /^[a-z0-9-]+(\.[a-z0-9-]+)+(:(\d+))?(\/.*)?$/i.test(input);
         if (isIPv4 || isLocalHost) input = 'http://' + input;
         else if (isDomain) input = 'https://' + input;
-        else input = 'https://' + ({google:'www.google.com/search?q=',bing:'www.bing.com/search?q=',duckduckgo:'https://duckduckgo.com/?q='}[settingsPrefs.searchEngine || 'google']) + encodeURIComponent(input);
+        else input = 'https://' + ({google:'www.google.com/search?q=',bing:'www.bing.com/search?q=',duckduckgo:'duckduckgo.com/?q='}[settingsPrefs.searchEngine || 'google']) + encodeURIComponent(input);
       }
       try { new URL(input); } catch (e) { showToast('Invalid address. Check the URL and try again.'); return; }
       navigateActiveTab(input);
