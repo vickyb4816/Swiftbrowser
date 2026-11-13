@@ -121,3 +121,16 @@ The CI pipeline must download only the pinned official upstream release, verify 
 - [ ] Installer and portable ZIP published.
 
 **Important:** This roadmap commit is not a browser installer. No binary should be advertised as ready until the remaining build and test gates are complete.
+
+
+## Build update — 2026-11-13
+
+- First Windows x64 packaging build completed successfully in GitHub Actions.
+- Verified official Supermium 150.0.7871.255 R2.02 portable archive against SHA-256: `50498112ed7107df9ec3b59794850eff5a9c08918895308bcb529171a5e9a007`.
+- Produced Swift Browser 1.2.0 Windows x64 installer and portable ZIP as workflow artifacts; checksum file included.
+- Launcher applies the requested TLS 1.2-only min/max policy at startup and uses a separate Swift Browser profile. Certificate validation and Chromium sandbox are not disabled.
+- Launcher script adjusted to avoid PowerShell 3+ syntax and remain compatible with Windows PowerShell 2.0.
+- Build run: https://github.com/vickyb4816/Swiftbrowser/actions/runs/43410064863
+- Artifact expires 2026-12-13; it is a CI artifact, not a permanent public release.
+- Not yet verified on the user's Windows 7 PC or office radio devices. The hosted packaging runner was Windows Server 2025; successful packaging does not prove Windows 7 runtime compatibility.
+- Remaining before a public release: install/launch test on Windows 7 x64, confirm TLS flags are honored by this Supermium build, test office device TLS cipher/certificate compatibility, test WhatsApp Web/Capstone/extensions, then implement the separate tab-management and utility features.
