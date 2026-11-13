@@ -23,30 +23,43 @@ jobs:
         with:
           ref: fresh/supermium-swift-1.2.0
 
-      - name: Download pinned official Supermium x64 portable build
+      - name: Download and verify official Supermium x64 archive
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $url = "https://github.com/win32ss/supermium/releases/download/v150-r2.02/supermium_150_64_nonsetup.zip"
           $zip = Join-Path $env:RUNNER_TEMP "supermium.zip"
+          $unpack = Join-Path $env:RUNNER_TEMP "supermium-unpack"
           Invoke-WebRequest -Uri $url -OutFile $zip
           $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           $expected = "50498112ed7107df9ec3b59794850eff5a9c08918895308bcb529171a5e9a007"
           if ($actual -ne $expected) { throw "Supermium SHA-256 mismatch. Expected $expected, got $actual" }
-          New-Item -ItemType Directory -Force -Path "staging\Supermium" | Out-Null
-          Expand-Archive -LiteralPath $zip -DestinationPath "staging\Supermium" -Force
-          $chrome = Get-ChildItem -LiteralPath "staging\Supermium" -Filter "chrome.exe" -File -Recurse | Select-Object -First 1
+          Expand-Archive -LiteralPath $zip -DestinationPath $unpack -Force
+          $chrome = Get-ChildItem -LiteralPath $unpack -Filter "chrome.exe" -File -Recurse | Select-Object -First 1
           if ($null -eq $chrome) { throw "Official portable archive did not contain chrome.exe" }
-          "Verified Supermium archive SHA-256: $actual"
-          "Browser executable: $($chrome.FullName)"
+          New-Item -ItemType Directory -Force -Path "staging\Supermium" | Out-Null
+          $browserDir = Split-Path -Parent $chrome.FullName
+          Copy-Item -Path (Join-Path $browserDir "*") -Destination "staging\Supermium" -Recurse -Force
+          if (-not (Test-Path "staging\Supermium\chrome.exe")) { throw "Could not flatten Supermium browser folder" }
+          "Verified official archive SHA-256: $actual"
+          "Packaged browser executable: staging\Supermium\chrome.exe"
 
-      - name: Assemble Swift Browser package
+      - name: Build Swift Browser launcher EXE
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          $net2 = "$env:WINDIR\Microsoft.NET\Framework64\v2.0.50727"
+          if (-not (Test-Path $csc)) { throw "C# compiler not found: $csc" }
+          foreach ($assembly in @("mscorlib.dll", "System.dll", "System.Windows.Forms.dll")) {
+            if (-not (Test-Path (Join-Path $net2 $assembly))) { throw ".NET 2.0 reference assembly missing: $assembly" }
+          }
           New-Item -ItemType Directory -Force -Path "staging\swift-launcher", "dist" | Out-Null
+          & $csc /nologo /nostdlib /target:winexe /platform:x64 /out:staging\SwiftBrowser.exe /reference:"$net2\mscorlib.dll" /reference:"$net2\System.dll" /reference:"$net2\System.Windows.Forms.dll" swift-launcher\SwiftBrowserLauncher.cs
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path "staging\SwiftBrowser.exe")) { throw "SwiftBrowser.exe compilation failed" }
           Copy-Item "swift-launcher\SwiftBrowser.ps1" "staging\swift-launcher\SwiftBrowser.ps1"
           Copy-Item "SwiftBrowser.cmd" "staging\SwiftBrowser.cmd"
+          Copy-Item "packaging\START-HERE.txt" "staging\START-HERE.txt"
           @"
           Swift Browser 1.2.0
           Made by Vicky Bhalerao
@@ -59,11 +72,12 @@ jobs:
           Upstream components remain subject to their respective licenses and notices distributed with the upstream package.
           TLS policy: TLS 1.2 only, configured at launch. Certificate validation and browser sandbox are not disabled.
           "@ | Set-Content -Encoding UTF8 "staging\UPSTREAM-NOTICES.txt"
-          $chrome = Get-ChildItem -LiteralPath "staging\Supermium" -Filter "chrome.exe" -File -Recurse | Select-Object -First 1
-          if ($null -eq $chrome) { throw "chrome.exe missing after package assembly" }
-          $version = (Get-Item $chrome.FullName).VersionInfo.ProductVersion
-          "Detected chrome.exe product version: $version"
           Compress-Archive -Path "staging\*" -DestinationPath "dist\Swift-Browser-1.2.0-win-x64-portable.zip" -CompressionLevel Optimal -Force
+          $entries = Get-ChildItem "staging" -Force
+          $entries | Select-Object Name,Mode
+          foreach ($required in @("SwiftBrowser.exe", "SwiftBrowser.cmd", "Supermium", "swift-launcher", "START-HERE.txt")) {
+            if (-not (Test-Path (Join-Path "staging" $required))) { throw "Required package item missing: $required" }
+          }
 
       - name: Install Inno Setup
         shell: pwsh
