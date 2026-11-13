@@ -1,4 +1,4 @@
-const { app, BrowserWindow, session, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, session, ipcMain, dialog, Menu } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { exec } = require('child_process');
 const path = require('path');
@@ -23,17 +23,7 @@ const configPath = path.join(app.getPath('userData'), 'swift-config.json');
 
 function loadConfig() {
   if (!fs.existsSync(configPath)) {
-    const defaultData = {
-      priorityDomains: ['cnmaestro.com', 'whatsapp.com', 'capstone', 'rftr', 'inventum'],
-      bookmarks: [
-        { title: 'WhatsApp Web', url: 'https://web.whatsapp.com' },
-        { title: 'cnMaestro', url: 'https://cnmaestro.com' },
-        { title: 'RFTR', url: 'https://rftr.com' },
-        { title: 'WO Tracker', url: 'https://wotracker.com' },
-        { title: 'Inventum', url: 'https://inventum.com' },
-        { title: 'Capstone', url: 'https://capstone.com' }
-      ]
-    };
+    const defaultData = { priorityDomains: ['whatsapp.com', 'capstone'], bookmarks: [] };
     fs.writeFileSync(configPath, JSON.stringify(defaultData, null, 2));
     return defaultData;
   }
@@ -46,6 +36,46 @@ function saveConfig(data) {
 
 app.whenReady().then(async () => {
   const swiftSession = session.fromPartition('persist:swift');
+
+  // Narrow exception for the user's explicitly identified legacy office appliance.
+  // Do NOT disable certificate checks globally.
+  swiftSession.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+    let host = '';
+    try { host = new URL(url).hostname; } catch (e) {}
+    if (host === '192.168.249.102' && error === 'net::ERR_CERT_AUTHORITY_INVALID') {
+      event.preventDefault();
+      callback(true);
+    } else {
+      callback(false);
+    }
+  });
+
+  // Native context menu for webpage text, links, images and editable fields.
+  app.on('web-contents-created', (_event, contents) => {
+    contents.on('context-menu', (_event, params) => {
+      const menuItems = [];
+      if (params.isEditable) {
+        menuItems.push(
+          { role: 'cut', enabled: params.editFlags.canCut },
+          { role: 'copy', enabled: params.editFlags.canCopy },
+          { role: 'paste', enabled: params.editFlags.canPaste },
+          { role: 'selectAll' }
+        );
+      } else {
+        menuItems.push(
+          { role: 'back', enabled: contents.navigationHistory ? contents.navigationHistory.canGoBack() : contents.canGoBack() },
+          { role: 'forward', enabled: contents.navigationHistory ? contents.navigationHistory.canGoForward() : contents.canGoForward() },
+          { type: 'separator' },
+          { role: 'copy', enabled: params.editFlags.canCopy },
+          { role: 'selectAll' }
+        );
+      }
+      if (params.linkURL) menuItems.push({ type: 'separator' }, { label: 'Copy link address', click: () => require('electron').clipboard.writeText(params.linkURL) });
+      if (params.srcURL) menuItems.push({ label: 'Copy image address', click: () => require('electron').clipboard.writeText(params.srcURL) });
+      menuItems.push({ type: 'separator' }, { role: 'reload' });
+      Menu.buildFromTemplate(menuItems).popup({ window: BrowserWindow.fromWebContents(contents) || mainWindow });
+    });
+  });
 
   swiftSession.webRequest.onBeforeSendHeaders((details, callback) => {
     const config = loadConfig();
@@ -65,7 +95,7 @@ app.whenReady().then(async () => {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    title: 'Swift Browser (Low-RAM Edition)',
+    title: 'Swift Browser',
     autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true,
