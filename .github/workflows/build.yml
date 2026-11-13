@@ -1,22 +1,33 @@
 name: Build and Release Swift Browser
-on: 
+
+on:
   push:
-    branches: [ main, master ]
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
 jobs:
   release:
     runs-on: windows-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install
+
+      - name: Install dependencies
+        run: npm install
+
       - name: Record build date
-        shell: bash
-        run: node -e "require('fs').writeFileSync('build-info.json', JSON.stringify({builtAt: new Date().toISOString()}))"
-      - name: Build and Publish to GitHub Releases
+        shell: pwsh
+        run: |
+          node -e "require('fs').writeFileSync('build-info.json', JSON.stringify({builtAt: new Date().toISOString()}))"
+
+      - name: Build and publish Swift Browser
         run: npm run build -- --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
