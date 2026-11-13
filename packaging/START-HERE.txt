@@ -1,0 +1,16 @@
+SWIFT BROWSER 1.2.0 — START HERE
+Made by Vicky Bhalerao
+
+PORTABLE VERSION
+1. Extract the complete ZIP to a normal folder. Do not run chrome.exe from inside the Supermium folder.
+2. Double-click SwiftBrowser.exe in this folder.
+3. SwiftBrowser.exe starts the Swift Browser launcher, which starts the bundled Supermium engine with the requested TLS 1.2-only launch settings.
+
+The Supermium folder contains the browser engine. It is not the Swift Browser start button.
+SwiftBrowser.cmd is included as a fallback launcher if the EXE cannot start.
+
+TLS NOTE
+TLS 1.2-only is requested at browser launch. This cannot repair an invalid/self-signed device certificate or a server cipher/signature mismatch. Do not disable certificate checks.
+If a device still fails, record the exact browser error code (for example ERR_SSL_VERSION_OR_CIPHER_MISMATCH or ERR_CERT_AUTHORITY_INVALID) and the device URL.
+
+This package contains the unmodified Supermium browser engine plus an independent Swift Browser launcher.
