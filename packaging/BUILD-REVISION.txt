@@ -1,0 +1,1 @@
+Build revision 2: resolve Inno Setup compiler path using the runner's actual Program Files directory.
